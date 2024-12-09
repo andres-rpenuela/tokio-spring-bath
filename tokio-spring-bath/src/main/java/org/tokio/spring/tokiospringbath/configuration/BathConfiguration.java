@@ -7,11 +7,12 @@ import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.ItemProcessor;
-import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
+import org.springframework.batch.item.database.JdbcBatchItemWriter;
+import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
-import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,8 +23,7 @@ import org.tokio.spring.tokiospringbath.domain.Product;
 import org.tokio.spring.tokiospringbath.listener.JobCompletionNotificationListener;
 import org.tokio.spring.tokiospringbath.processor.ProductItemProcessor;
 
-import java.util.Arrays;
-import java.util.List;
+import javax.sql.DataSource;
 
 @Configuration
 @EnableAutoConfiguration
@@ -35,20 +35,20 @@ public class BathConfiguration {
 
 
     @Bean
-    public Job job(JobRepository jobRepository, PlatformTransactionManager transactionManager, JdbcTemplate jdbcTemplate) {
+    public Job job(JobRepository jobRepository, PlatformTransactionManager transactionManager, JdbcTemplate jdbcTemplate,DataSource dataSource) throws Exception {
         return new JobBuilder("job", jobRepository)
                 .incrementer(new RunIdIncrementer())
                 .listener(new JobCompletionNotificationListener(jdbcTemplate) )
-                .start(chunkStep(jobRepository, transactionManager))
+                .start(chunkStep(jobRepository, transactionManager,dataSource))
                 .build();
     }
 
     @Bean
-    public Step chunkStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+    public Step chunkStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,DataSource dataSource) {
         return new StepBuilder("step", jobRepository).<Product,Product>chunk(10,transactionManager)
                 .reader(csvListReader())
                 .processor(productProcessor())
-                .writer(productWriter())
+                .writer(productWriter(dataSource))
                 .build();
     }
 
@@ -74,10 +74,11 @@ public class BathConfiguration {
 
     //@StepScope
     @Bean
-    public ItemWriter<Product> productWriter() {
-        return items -> {
-            System.out.println("Itens processados:");
-            items.forEach(System.out::println);
-        };
+    public JdbcBatchItemWriter<Product> productWriter(DataSource dataSource) {
+        return new JdbcBatchItemWriterBuilder<Product>().itemSqlParameterSourceProvider(
+                new BeanPropertyItemSqlParameterSourceProvider<Product>()
+        ).sql("INSERT INTO product (name,description,category,price,discount,taxes,stock_quantity) VALUES (" +
+                ":name, :description, :category, :price, :discount, :taxes, :stock)")
+                .dataSource(dataSource).build();
     }
 }
