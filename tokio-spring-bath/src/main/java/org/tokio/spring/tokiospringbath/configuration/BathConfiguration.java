@@ -16,8 +16,10 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.tokio.spring.tokiospringbath.domain.Product;
+import org.tokio.spring.tokiospringbath.listener.JobCompletionNotificationListener;
 import org.tokio.spring.tokiospringbath.processor.ProductItemProcessor;
 
 import java.util.Arrays;
@@ -33,9 +35,10 @@ public class BathConfiguration {
 
 
     @Bean
-    public Job job(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+    public Job job(JobRepository jobRepository, PlatformTransactionManager transactionManager, JdbcTemplate jdbcTemplate) {
         return new JobBuilder("job", jobRepository)
                 .incrementer(new RunIdIncrementer())
+                .listener(new JobCompletionNotificationListener(jdbcTemplate) )
                 .start(chunkStep(jobRepository, transactionManager))
                 .build();
     }
