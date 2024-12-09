@@ -15,6 +15,7 @@ public class TokioSpringBathApplication {
 	public static void main(String[] args) {
 
 		ApplicationContext context = SpringApplication.run(TokioSpringBathApplication.class, args);
+		/*
 		ProductService productService = (ProductService) context.getBean("productServiceImpl");
 		productService.countProducts();
 
@@ -28,6 +29,7 @@ public class TokioSpringBathApplication {
 				.stock(10).build();
 		productService.save(product);
 		productService.countProducts();
+		 */
 	}
 
 }
